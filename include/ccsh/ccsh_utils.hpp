@@ -4,13 +4,21 @@
 #include <cstddef>
 #include <exception>
 #include <stdexcept>
+#include <array>
 #include <string>
 
+#include "ccsh_types.hpp"
 #include "ccsh_filesystem.hpp"
 
 #include "CWrapper.hpp"
 
 namespace ccsh {
+
+namespace internal {
+
+void expand_helper(fs::path const& p, std::vector<fs::path>& result);
+
+}
 
 namespace fs {
 std::vector<path> expand(path const& p);
@@ -34,7 +42,24 @@ std::string get_ttyname();
 
 bool is_user_possibly_elevated();
 
-class stdc_error : public std::runtime_error
+class shell_error : public std::runtime_error
+{
+    using std::runtime_error::runtime_error;
+};
+
+class winapi_error : public shell_error
+{
+    error_t error_number;
+public:
+    winapi_error();
+    explicit winapi_error(error_t no);
+    winapi_error(error_t no, std::string const& msg);
+
+    error_t no() const
+    { return error_number; }
+};
+
+class stdc_error : public shell_error
 {
     int error_number;
 public:
@@ -46,20 +71,15 @@ public:
 };
 
 
-class shell_error : public std::runtime_error
-{
-    using std::runtime_error::runtime_error;
-};
-
-
 class env_var
 {
     std::string name;
 public:
 
-    static const char* get(std::string const& name);
-    static void set(std::string const& name, std::string const& value, bool override = true);
-    static int try_set(std::string const& name, std::string const& value, bool override = true);
+    static std::string get(std::string const& name);
+    static const char* try_get(std::string const& name); // WARNING: on windows, you should copy the return value if the function succeeds
+    static void set(std::string const& name, std::string const& value, bool overwrite = true);
+    static int try_set(std::string const& name, std::string const& value, bool overwrite = true);
 
     explicit env_var(std::string name)
         : name(std::move(name))
@@ -78,13 +98,17 @@ namespace internal {
 
 struct open_traits
 {
-    static constexpr int invalid_value = -1;
-    using exception = stdc_error;
+#ifdef _WIN32
+    static const fd_t invalid_value;
+#else
+    static constexpr fd_t invalid_value = -1;
+#endif
+    using exception = fd_exception_t;
 
-    static void dtor_func(int fd) noexcept;
+    static void dtor_func(fd_t fd) noexcept;
 };
 
-using open_wrapper = CW::CWrapper<int, open_traits>;
+using open_wrapper = CW::CWrapper<fd_t, open_traits, CW::CWrapperType::Get, false>;
 
 enum class stdfd : uint8_t
 {
@@ -93,6 +117,14 @@ enum class stdfd : uint8_t
     err = 2,
     count
 };
+
+using pipe_t = std::array<open_wrapper, 2>;
+
+pipe_t pipe_compat();
+std::size_t read_compat(fd_t file, void* data, std::size_t size);
+std::size_t write_compat(fd_t file, void* data, std::size_t size);
+fd_t duplicate_compat(fd_t file);
+void close_compat(fd_t fd);
 
 } // namespace internal
 

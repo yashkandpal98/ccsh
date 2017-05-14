@@ -13,7 +13,7 @@ namespace internal {
 
 command_runnable operator<(command const& c, std::string& str)
 {
-    auto func = [&str](char* buf, std::size_t s) -> ssize_t
+    auto func = [&str](char* buf, std::size_t s) -> int64_t
     {
         std::size_t len = str.length();
         len = len < s ? len : s;
@@ -54,7 +54,7 @@ command_runnable operator>=(command const& c, std::string& str)
 
 command_runnable operator<(command const& c, std::vector<std::string>& vec)
 {
-    auto func = [&vec](char* buf, std::size_t s) -> ssize_t
+    auto func = [&vec](char* buf, std::size_t s) -> int64_t
     {
         if (s == 0 || vec.empty())
             return 0;

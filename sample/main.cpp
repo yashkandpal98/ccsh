@@ -10,16 +10,28 @@
 
 using namespace ccsh::literals;
 
+void test_winapi()
+{
+    std::cout << ccsh::get_home().string() << std::endl;
+    ccsh::shell("help") > "bs.txt"_p;
+    ccsh::shell("help") | ccsh::shell("findstr", {"x*"});
+}
+
 void test0()
 {
     std::cout << ccsh::get_home().string() << std::endl;
     ccsh::shell("la");
+
+    // ccsh::shell("help");
+    // ccsh::shell("dir").run();
+    ccsh::shell("help") > "asd.txt"_p;
+    // (ccsh::shell("help") | ccsh::shell("more")).run();
+
     ccsh::shell("la") | ccsh::shell("cowsay"); // no cow should appear
 
     ccsh::fs::path f = "/tmp/bs.txt"_p;
 
-    ccsh::command c1 = ccsh::shell("ls", {"-lh"}) > f;
-    c1.run();
+    ccsh::shell("ls", {"-lh"}) > f;
 
     ccsh::shell("cat", {f.string()});
 
@@ -48,9 +60,9 @@ void test1()
 {
     using namespace ccsh;
     ccsh::command c1 = cat().e();
-    ccsh::command_builder<cat> x = cat().n();
-
-    x.T();
+    // FIXME: FUCKING RETARDED MSVC
+    // ccsh::command_builder<cat> x = cat().n();
+    // x.T();
 }
 
 void test2()
@@ -61,7 +73,7 @@ void test2()
     $("BAFFER") = "some text";
     std::cout << $("BAFFER") << std::endl;
 
-    shell("echo", {$(shell("ls"))});
+    // shell("echo", {$(shell("ls"))});
 }
 
 void test3()
@@ -89,12 +101,13 @@ void test5()
 
 int main()
 {
-    test0();
+    test_winapi();
+    /*test0();
     test1();
     test2();
     test3();
     test4();
-    test5();
+    test5();*/
 
     return 0;
 }

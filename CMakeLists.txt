@@ -16,15 +16,22 @@ if(BOOST_FILESYSTEM)
     find_package(Boost COMPONENTS filesystem system REQUIRED)
     add_definitions(-DCCSH_FILESYSTEM_BOOST)
     set(filesystem_lib "${Boost_LIBRARIES}")
-else()
+elseif(NOT WIN32)
     set(filesystem_lib "stdc++fs")
 endif()
 
 include_directories(include)
 
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -Wextra -pedantic") # warning level
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11") # ensure C++11
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -g") # add debug symbols even in release
+if(WIN32)
+    add_definitions(/DUNICODE /D_UNICODE /EHsc /std:c++latest)
+    set(CMAKE_WINDOWS_EXPORT_ALL_SYMBOLS ON)
+    SET(LIBRARY_OUTPUT_PATH ${CMAKE_BINARY_DIR}/Bin/${CMAKE_BUILD_TYPE} CACHE PATH "Library output path")
+    SET(EXECUTABLE_OUTPUT_PATH ${CMAKE_BINARY_DIR}/Bin/${CMAKE_BUILD_TYPE} CACHE PATH "Executable output path")
+else()
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -Wextra -pedantic") # warning level
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11") # ensure C++11
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -g") # add debug symbols even in release
+endif()
 
 if(WITH_LIB)
     add_subdirectory(lib)

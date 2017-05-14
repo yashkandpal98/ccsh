@@ -55,6 +55,14 @@ compile_commands.json
 *.workspace
 .codelite/*
 .idea/*
+.vs/*
+*.sln
+*.vcxproj
+*.vcxproj.filters
+*.vcxproj.user
+*.dir
+Bin/*
+Win32/*
 
 # Coverage reports
 coverage/*

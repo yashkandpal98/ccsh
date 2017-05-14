@@ -14,10 +14,10 @@
 namespace ccsh {
 namespace internal {
 
-using command_functor_raw  = std::function<ssize_t(char*, std::size_t)>;
+using command_functor_raw  = std::function<int64_t(char*, std::size_t)>;
 using command_functor_init = std::function<void(void)>;
 using command_functor_line = std::function<void(std::string const&)>;
-using command_functor      = std::function<int(int, int, int)>;
+using command_functor      = std::function<int(fd_t, fd_t, fd_t)>;
 
 template<typename>
 class command_holder;
@@ -38,7 +38,7 @@ class command_base
     friend class command;
 
 public:
-    virtual void start_run(int, int, int, std::vector<int> unused_fds) const = 0;
+    virtual void start_run(fd_t, fd_t, fd_t, std::vector<fd_t> unused_fds) const = 0;
     virtual int finish_run() const = 0;
 
     int run() const;
@@ -76,13 +76,13 @@ class command_native : public command_base, private command_async
 protected:
 
     fs::path p;
-    std::vector<std::string> args;
+    std::vector<tstring_t> args;
 
     friend class command_source;
 
-    virtual std::vector<const char*> get_argv() const
+    virtual std::vector<const tchar_t*> get_argv() const
     {
-        std::vector<const char*> argv;
+        std::vector<const tchar_t*> argv;
         argv.reserve(args.size() + 2);
 
         argv.push_back(p.c_str());
@@ -93,20 +93,24 @@ protected:
         return argv;
     }
 
+    void add_arg(const char* str);
+    void add_arg(std::string const& str);
+    void add_arg(std::string&& str);
+
 public:
 
-    explicit command_native(fs::path p, std::vector<std::string> args = {})
-        : p(std::move(p))
-        , args(std::move(args))
-    { }
+    explicit command_native(fs::path p, std::vector<std::string> args = {});
 
     void append_dir(fs::path const& dir)
     {
         p = dir / p;
     }
 
-    void start_run(int in, int out, int err, std::vector<int> unused_fds) const final;
-    int finish_run() const final;
+    void start_run(fd_t in, fd_t out, fd_t err, std::vector<fd_t> unused_fds) const final;
+    int finish_run() const final
+	{
+		return result.get();
+	}
 };
 
 class command_runnable : protected std::shared_ptr<command_base>
@@ -137,7 +141,7 @@ public:
             (*this)->no_autorun();
     }
 
-    void start_run(int in, int out, int err, std::vector<int> unused_fds) const
+    void start_run(fd_t in, fd_t out, fd_t err, std::vector<fd_t> unused_fds) const
     {
         (*this)->start_run(in, out, err, std::move(unused_fds));
     }
@@ -247,7 +251,7 @@ class command_conditonal : public command_pair, protected command_async
 public:
     using command_pair::command_pair;
 
-    void start_run(int in, int out, int err, std::vector<int> unused_fds) const final
+    void start_run(fd_t in, fd_t out, fd_t err, std::vector<fd_t> unused_fds) const final
     {
         auto f = [=]
         {
@@ -311,7 +315,7 @@ public:
         : b(b)
     { }
 
-    void start_run(int, int, int, std::vector<int>) const override
+    void start_run(fd_t, fd_t, fd_t, std::vector<fd_t>) const override
     { }
 
     int finish_run() const override
@@ -324,8 +328,13 @@ class command_pipe final : public command_pair
 {
 public:
     using command_pair::command_pair;
-    void start_run(int in, int out, int err, std::vector<int> unused_fds) const override;
-    int finish_run() const override;
+    void start_run(fd_t in, fd_t out, fd_t err, std::vector<fd_t> unused_fds) const override;
+	int finish_run() const override
+	{
+		int result1 = left.finish_run();
+		int result2 = right.finish_run();
+        return result1 == 0 ? result2 : result1;
+	}
 };
 
 class command_mapping : public command_base, protected command_async
@@ -353,21 +362,21 @@ class command_in_mapping final : public command_mapping
 {
 public:
     using command_mapping::command_mapping;
-    void start_run(int, int, int, std::vector<int>) const override;
+    void start_run(fd_t, fd_t, fd_t, std::vector<fd_t>) const override;
 };
 
 class command_out_mapping final : public command_mapping
 {
 public:
     using command_mapping::command_mapping;
-    void start_run(int, int, int, std::vector<int>) const override;
+    void start_run(fd_t, fd_t, fd_t, std::vector<fd_t>) const override;
 };
 
 class command_err_mapping final : public command_mapping
 {
 public:
     using command_mapping::command_mapping;
-    void start_run(int, int, int, std::vector<int>) const override;
+    void start_run(fd_t, fd_t, fd_t, std::vector<fd_t>) const override;
 };
 
 template<stdfd DESC>
@@ -379,7 +388,7 @@ class command_redirect final : public command_base
     mutable open_wrapper fd;
 public:
     command_redirect(command c, fs::path p, bool append = false);
-    void start_run(int in, int out, int err, std::vector<int>) const override;
+    void start_run(fd_t in, fd_t out, fd_t err, std::vector<fd_t>) const override;
 
     int finish_run() const override
     {
@@ -404,8 +413,8 @@ class command_fd final : public command_base
     command c;
     open_wrapper ow;
 public:
-    command_fd(command c, int fd);
-    void start_run(int in, int out, int err, std::vector<int>) const override;
+    command_fd(command c, fd_t fd);
+    void start_run(fd_t in, fd_t out, fd_t err, std::vector<fd_t>) const override;
 
     int finish_run() const override
     {
@@ -421,7 +430,7 @@ class command_source final : public command_base, protected command_async
 public:
     explicit command_source(fs::path const& p, std::vector<std::string> const& args = {});
 
-    void start_run(int in, int out, int err, std::vector<int>) const override;
+    void start_run(fd_t in, fd_t out, fd_t err, std::vector<fd_t>) const override;
 
     int finish_run() const override
     {
@@ -433,13 +442,13 @@ public:
 class command_builtin : public command_base
 {
 private:
-    mutable int result;
+    mutable int result = 0;
 public:
     using command_base::command_base;
 
-    virtual int runx(int in, int out, int err) const = 0;
+    virtual int runx(fd_t in, fd_t out, fd_t err) const = 0;
 
-    void start_run(int in, int out, int err, std::vector<int>) const override
+    void start_run(fd_t in, fd_t out, fd_t err, std::vector<fd_t>) const override
     {
         result = runx(in, out, err);
     }
@@ -458,7 +467,7 @@ public:
         : func(std::move(func))
     { }
 
-    void start_run(int in, int out, int err, std::vector<int>) const override;
+    void start_run(fd_t in, fd_t out, fd_t err, std::vector<fd_t>) const override;
 
     int finish_run() const override
     {

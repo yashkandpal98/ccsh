@@ -13,7 +13,7 @@
 #include <unordered_set>
 #include <vector>
 
-#include <unistd.h>
+// #include <unistd.h>
 
 using namespace ccsh;
 
@@ -152,7 +152,7 @@ int main(int argc, char** argv)
         cxx = "/usr/bin/c++";
 
     auto const& file = *file_it;
-    auto shebang_remover = [&](int, int out_fd, int)
+    auto shebang_remover = [&](fd_t, fd_t out_fd, fd_t)
     {
         ccsh::ofdstream out{out_fd};
         try
@@ -189,7 +189,8 @@ int main(int argc, char** argv)
         std::cerr << "While executing " << file << std::endl;
     }
 
-    std::remove(temp.c_str());
+    std::string temp_str = temp.string();
+    std::remove(temp_str.c_str());
 
     return result;
 }
