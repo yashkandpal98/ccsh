@@ -29,11 +29,13 @@ TEST(EnvVarTest, source)
     fs::path vars = fs::path{__FILE__}.parent_path() / "vars.sh"_p;
     ASSERT_EQ(fs::exists(vars), true);
     source(vars);
+#ifndef _WIN32
     std::string var1, var2;
     var1 = $("EXAMPLE_ENV_VAR1");
     var2 = $("EXAMPLE_ENV_VAR2");
     EXPECT_EQ(var1, "");
     EXPECT_EQ(var2, "value2");
+#endif
 }
 
 TEST(EnvVarTest, set)

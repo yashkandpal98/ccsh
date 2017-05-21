@@ -63,6 +63,11 @@ compile_commands.json
 *.dir
 Bin/*
 Win32/*
+packages/*
+packages.config
 
 # Coverage reports
 coverage/*
+
+# Test temp files
+test/temp/*

@@ -61,8 +61,9 @@ tstring_t convert_argv(std::vector<const tchar_t*> const& argv)
                 backslash_count = 0;
                 break;
             default:
-                result += arg[i];
+                result.append(backslash_count, L'\\');
                 backslash_count = 0;
+                result += arg[i];
             }
         }
         result.append(backslash_count * 2, L'\\');
@@ -194,14 +195,14 @@ void command_native::start_run(fd_t in, fd_t out, fd_t err, std::vector<fd_t>) c
     if(inherit_by_default())
     {
         fd_t inherited[] = {in, out, err};
-        winapi_thrower(CreateProcessWithExplicitHandles(nullptr, &cmdargs[0], nullptr, nullptr, true, 0, nullptr, nullptr, &startupinfo, &processinfo, 3, inherited));
+        winapi_thrower(CreateProcessWithExplicitHandles(nullptr, &cmdargs[0], nullptr, nullptr, true, 0, nullptr, nullptr, &startupinfo, &processinfo, 3, inherited), p.string());
     }
     else
     {
         inherit_helper temp1{in};
         inherit_helper temp2{out};
         inherit_helper temp3{err};
-        winapi_thrower(CreateProcessW(nullptr, &cmdargs[0], nullptr, nullptr, true, 0, nullptr, nullptr, &startupinfo, &processinfo));
+        winapi_thrower(CreateProcessW(nullptr, &cmdargs[0], nullptr, nullptr, true, 0, nullptr, nullptr, &startupinfo, &processinfo), p.string());
     }
 
     open_wrapper proc{processinfo.hProcess};
@@ -230,8 +231,8 @@ command_redirect<DESC>::command_redirect(command c, fs::path p, bool append)
 template<stdfd DESC>
 void command_redirect<DESC>::start_run(fd_t in, fd_t out, fd_t err, std::vector<fd_t> unused_fds) const
 {
-    DWORD dwCreationDisposition = DESC == stdfd::in ? OPEN_EXISTING : OPEN_ALWAYS;
-    DWORD dwDesiredAccess = DESC == stdfd::in ? GENERIC_READ : (bool(flags) ? FILE_APPEND_DATA : GENERIC_WRITE);
+    DWORD dwCreationDisposition = DESC == stdfd::in ? OPEN_EXISTING : (bool(flags) ? OPEN_ALWAYS      : CREATE_ALWAYS);
+    DWORD dwDesiredAccess =       DESC == stdfd::in ? GENERIC_READ  : (bool(flags) ? FILE_APPEND_DATA : GENERIC_WRITE);
 
     SECURITY_ATTRIBUTES secattr = {0};
     secattr.nLength = sizeof(SECURITY_ATTRIBUTES);
@@ -255,6 +256,7 @@ command_source::command_source(fs::path const& p, std::vector<std::string> const
 
 void command_source::start_run(fd_t, fd_t, fd_t, std::vector<fd_t>) const
 {
+    result = std::async(std::launch::async, [] { return 0; });
     // stub
 }
 

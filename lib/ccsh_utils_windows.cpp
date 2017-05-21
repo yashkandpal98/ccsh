@@ -5,30 +5,19 @@
 
 #include <mutex>
 
+#include <ccsh/simpleopt/SimpleGlob.h>
+
 namespace ccsh {
 namespace internal {
 
 void expand_helper(fs::path const& p, std::vector<fs::path>& result)
 {
-    WIN32_FIND_DATAW finddata;
-    HANDLE found = FindFirstFileW(p.c_str(), &finddata);
-    if (found == INVALID_HANDLE_VALUE)
-    {
-        result.push_back(p);
-        return;
-    }
-
-    BOOL success = true;
-    while (success)
-    {
-        result.push_back(finddata.cFileName);
-        success = FindNextFileW(found, &finddata);
-    }
-
-    error_t err = GetLastError();
-    if (err != ERROR_NO_MORE_FILES)
-        throw winapi_error(err);
+    CSimpleGlobW glob(SG_GLOB_NOCHECK);
+    glob.Add(p.c_str());
+    for (int i = 0; i < glob.FileCount(); ++i)
+        result.emplace_back(glob.File(i));
 }
+
 
 } // namespace internal
 
@@ -91,11 +80,14 @@ winapi_error::winapi_error(error_t no)
     , error_number(no)
 {}
 
+winapi_error::winapi_error(std::string const & msg)
+    : winapi_error(GetLastError(), msg)
+{}
+
 winapi_error::winapi_error(error_t no, std::string const & msg)
     : shell_error(msg.empty() ? get_error_as_string(no) : msg + ": " + get_error_as_string(no))
     , error_number(no)
-{
-}
+{}
 
 namespace {
 
@@ -148,10 +140,16 @@ int env_var::try_set(std::string const& name, std::string const& value, bool ove
     if (!overwrite)
     {
         size_t envsize = 0;
-        errcode = getenv_s(&envsize, 0, 0, name.c_str());
+        errcode = getenv_s(&envsize, nullptr, 0, name.c_str());
         if (errcode || envsize) return errcode;
     }
-    return _putenv_s(name.c_str(), value.c_str());
+    errno_t err = _putenv_s(name.c_str(), value.c_str());
+    if (err)
+    {
+        errno = err;
+        return -1;
+    }
+    return 0;
 }
 
 namespace internal {

@@ -53,6 +53,7 @@ class winapi_error : public shell_error
 public:
     winapi_error();
     explicit winapi_error(error_t no);
+    explicit winapi_error(std::string const& msg);
     winapi_error(error_t no, std::string const& msg);
 
     error_t no() const

@@ -14,7 +14,7 @@
 namespace ccsh {
 
 template<typename ErrorType>
-inline void winapi_thrower(ErrorType result)
+void winapi_thrower(ErrorType result)
 {
     if (result == 0)
         throw winapi_error();
@@ -32,6 +32,13 @@ inline void winapi_thrower<DWORD>(DWORD result)
 {
     if (result == 0xFFFFFFFF)
         throw winapi_error();
+}
+
+template<typename ErrorType>
+void winapi_thrower(ErrorType result, std::string const& msg)
+{
+    if (result == 0)
+        throw winapi_error(msg);
 }
 
 inline error_t from_hresult(HRESULT hr)
